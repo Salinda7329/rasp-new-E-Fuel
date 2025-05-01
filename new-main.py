@@ -153,7 +153,7 @@ def get_meter_reading_with_retry(camera_device, max_attempts=3):
 
         if result.read is not None and result.read.blocks:
             lines = result.read.blocks[0].lines
-            print("🧾 OCR Lines:")
+            print("OCR Lines:")
             for line in lines:
                 print(f"Line: '{line.text}'")
 
