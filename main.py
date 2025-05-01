@@ -156,37 +156,41 @@ def get_meter_reading(image_path):
     return rupees, litres
 
 def main():
-    while True:
-        print("Waiting for object...")
-        GPIO.wait_for_edge(13, GPIO.RISING)
-        print("Object detected")
-        print("GPIO input:", GPIO.input(13))
+    try:
+        while True:
+            print("Waiting for object...")
+            GPIO.wait_for_edge(13, GPIO.RISING)
+            print("Object detected")
+            print("GPIO input:", GPIO.input(13))
 
+            image_name = capture_image("vehicle")
+            if image_name is None:
+                print("No image name")
+                continue
 
-        image_name = capture_image("vehicle")
-        if image_name is None:
-            print("No image name")
-            continue
+            image_path = f"images/vehicle_reg_numbers/{image_name}.jpg"
+            vehicle_reg_number = get_vehicle_reg_number(image_path)
+            print("Vehicle number:", vehicle_reg_number)
 
-        image_path = f"images/vehicle_reg_numbers/{image_name}.jpg"
-        vehicle_reg_number = get_vehicle_reg_number(image_path)
-        print("Vehicle number:", vehicle_reg_number)
+            if get_vehicle_status(vehicle_reg_number):
+                print("Valid vehicle, opening gate...")
+                open_gate()
+                sleep(5)  # wait for gate to close
 
-        if get_vehicle_status(vehicle_reg_number):
-            print("Valid vehicle, opening gate...")
-            open_gate()
-            sleep(5)  # wait for gate to close after 5 seconds
+                print("Waiting for pump interaction...")
+                GPIO.wait_for_edge(13, GPIO.RISING)
 
-            print("Waiting for pump interaction...")
-            GPIO.wait_for_edge(13, GPIO.RISING)  # wait again
+                meter_image_name = capture_image("meter")
+                meter_image_path = f"images/meter_readings/{meter_image_name}.jpg"
+                amount, litres = get_meter_reading(meter_image_path)
+                print("Amount:", amount)
+                print("Litres:", litres)
+            else:
+                print("Not a registered vehicle")
+    finally:
+        print("Cleaning up GPIO...")
+        GPIO.cleanup()
 
-            meter_image_name = capture_image("meter")
-            meter_image_path = f"images/meter_readings/{meter_image_name}.jpg"
-            amount, litres = get_meter_reading(meter_image_path)
-            print("Amount:", amount)
-            print("Litres:", litres)
-        else:
-            print("Not a registered vehicle")
 
                 
                 
@@ -204,33 +208,9 @@ def get_available_camera(index=0):
         return None
 
 
-def capture_image(type="vehicle"):
-    pygame.camera.init()
-    cam = None
 
-    image_name = uuid.uuid4()
-    image_path = None
 
-    if type == "vehicle":
-        cam_path = get_available_camera(0)  # First working camera
-        image_path = f"images/vehicle_reg_numbers/{image_name}.jpg"
-    elif type == "meter":
-        cam_path = get_available_camera(1)  # Second working camera
-        image_path = f"images/meter_readings/{image_name}.jpg"
 
-    if cam_path is None:
-        print(f"No camera available for type: {type}")
-        return None
-
-    cam = pygame.camera.Camera(cam_path, (640, 480))
-    cam.start()
-    image = cam.get_image()
-    pygame.image.save(image, image_path)
-    cam.stop()
-    return image_name
-
-finally:
-    GPIO.cleanup()
   
 
 
