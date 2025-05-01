@@ -24,27 +24,26 @@ GPIO.setup(16, GPIO.IN)
 
 
 gate_pin = GPIO.PWM(11, 50)
-#test commit
-def capture_image(type="vehicle"):
-    """Captures an image using the webcam and saves it."""
+
+def capture_image(type="vehicle", camera_device="/dev/video0"):
     pygame.camera.init()
-    cam = None
-    
-    image_name=uuid.uuid4()
-    image_path = None
+    cam = pygame.camera.Camera(camera_device, (640, 480))
+
+    image_name = str(uuid.uuid4())
     if type == "vehicle":
-        cam = pygame.camera.Camera("/dev/video0", (640,480))
         image_path = f"images/vehicle_reg_numbers/{image_name}.jpg"
     elif type == "meter":
-        cam = pygame.camera.Camera("/dev/video1", (640,480))
-#        cam = pygame.camera.Camera("/dev/video2", (640,480))
         image_path = f"images/meter_readings/{image_name}.jpg"
-        
+    else:
+        print("Invalid capture type")
+        return None
+
     cam.start()
     image = cam.get_image()
     pygame.image.save(image, image_path)
     cam.stop()
     return image_name
+
 
 def get_vehicle_reg_number(image_path):
     try:
@@ -123,41 +122,61 @@ def get_vehicle_status(vehicle_reg_number):
         return True
     return False
 
-def get_meter_reading(image_path):
-    try:
-        endpoint = os.environ["VISION_ENDPOINT"]
-        key = os.environ["VISION_KEY"]
-    except KeyError:
-        print("Missing environment variable 'VISION_ENDPOINT' or 'VISION_KEY'")
-        exit()
+def get_meter_reading_with_retry(camera_device, max_attempts=3):
+    attempt = 0
+    rupees, litres = None, None
+    
+    while attempt < max_attempts:
+        print(f"📸 Attempt {attempt+1} to capture meter reading...")
 
-    # Create an Image Analysis client
-    client = ImageAnalysisClient(
-        endpoint=endpoint,
-        credential=AzureKeyCredential(key)
-    )
+        image_name = capture_image("meter", camera_device)
+        image_path = f"images/meter_readings/{image_name}.jpg"
 
-    with open(image_path, "rb") as f:
-        image_data = f.read()
+        try:
+            endpoint = os.environ["VISION_ENDPOINT"]
+            key = os.environ["VISION_KEY"]
+        except KeyError:
+            print("Missing environment variable 'VISION_ENDPOINT' or 'VISION_KEY'")
+            return None, None
 
-    result = client.analyze(
-        image_data=image_data,
-        visual_features=[VisualFeatures.READ]
-    )
+        client = ImageAnalysisClient(
+            endpoint=endpoint,
+            credential=AzureKeyCredential(key)
+        )
 
-    rupees = None
-    litres = None
-    if result.read is not None:
-        print(result.read.blocks[0].lines)
-        rupees = float(result.read.blocks[0].lines[1].text.replace(' ', '')) / 10
-        litres = float(result.read.blocks[0].lines[3].text.replace(' ', ''))
-        for line in result.read.blocks[0].lines:
-            print(f"Line: '{line.text}'")
-            vehicle_reg_number=line.text
-    else:
-        print("OCR operation failed or timed out")
-        
-    return rupees, litres
+        with open(image_path, "rb") as f:
+            image_data = f.read()
+
+        result = client.analyze(
+            image_data=image_data,
+            visual_features=[VisualFeatures.READ]
+        )
+
+        if result.read is not None and result.read.blocks:
+            lines = result.read.blocks[0].lines
+            print("🧾 OCR Lines:")
+            for line in lines:
+                print(f"Line: '{line.text}'")
+
+            if len(lines) >= 4:
+                try:
+                    rupees = float(lines[1].text.replace(' ', '')) / 10
+                    litres = float(lines[3].text.replace(' ', ''))
+                    print("✅ OCR success.")
+                    return rupees, litres
+                except ValueError:
+                    print("⚠️ OCR text couldn't be converted to numbers.")
+            else:
+                print("⚠️ Not enough lines detected in OCR.")
+        else:
+            print("⚠️ OCR returned no results.")
+
+        attempt += 1
+        print("🔁 Retrying...\n")
+
+    print("❌ All attempts failed.")
+    return None, None
+
 
 def main():
     try:
@@ -188,7 +207,7 @@ def main():
 
                 meter_image_name = capture_image("meter")
                 meter_image_path = f"images/meter_readings/{meter_image_name}.jpg"
-                amount, litres = get_meter_reading(meter_image_path)
+                amount, litres = get_meter_reading_with_retry("/dev/video2")
                 print("Amount:", amount)
                 print("Litres:", litres)
             else:
@@ -204,14 +223,6 @@ if __name__ == "__main__":
     main()
 
 
-
-def get_available_camera(index=0):
-    pygame.camera.init()
-    camlist = pygame.camera.list_cameras()
-    if len(camlist) > index:
-        return camlist[index]
-    else:
-        return None
 
 
 
