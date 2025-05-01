@@ -15,9 +15,8 @@ GPIO.setmode(GPIO.BOARD)
 GPIO.setwarnings(False)
 
 GPIO.setup(11, GPIO.OUT)
-# GPIO.setup(13, GPIO.IN)
-# add pull down resistor to pin 13
-GPIO.setup(13, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(13, GPIO.IN)
+
 
 gate_pin = GPIO.PWM(11, 50)
 #test commit
@@ -159,7 +158,7 @@ def main():
     try:
         while True:
             print("Waiting for object...")
-            GPIO.wait_for_edge(13, GPIO.RISING)
+            GPIO.wait_for_edge(13, GPIO.FALLING)
             print("Object detected")
             print("GPIO input:", GPIO.input(13))
 
@@ -178,7 +177,7 @@ def main():
                 sleep(5)  # wait for gate to close
 
                 print("Waiting for pump interaction...")
-                GPIO.wait_for_edge(13, GPIO.RISING)
+                GPIO.wait_for_edge(13, GPIO.RISING, timeout=5000, bouncetime=300)
 
                 meter_image_name = capture_image("meter")
                 meter_image_path = f"images/meter_readings/{meter_image_name}.jpg"
