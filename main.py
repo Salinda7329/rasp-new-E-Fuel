@@ -156,27 +156,35 @@ def get_meter_reading(image_path):
 
 def main():
     while True:
-        if GPIO.input(13):
-            print("Object detected")
-            image_name = capture_image("vehicle")
-            if image_name is None:
-                print("no image name")
-            image_path=f"images/vehicle_reg_numbers/{image_name}.jpg"
-            vehicle_reg_number=get_vehicle_reg_number(image_path)
-            print(vehicle_reg_number)
-            vehicle_status=get_vehicle_status(vehicle_reg_number)
-            print(vehicle_status)
-            if vehicle_status:
-                open_gate()
-                meter_reading_0_image_name = capture_image("meter")
-                meter_reading_0_image_path = f"images/meter_readings/{meter_reading_0_image_name}.jpg"
-                amount, litres = get_meter_reading(meter_reading_0_image_path)
-                print("amount: ", amount)
-                print("litres: ", litres)
-            else:
-                print("Not a registered vehicle")
+        print("Waiting for object...")
+        GPIO.wait_for_edge(13, GPIO.RISING)
+        print("Object detected")
+
+        image_name = capture_image("vehicle")
+        if image_name is None:
+            print("No image name")
+            continue
+
+        image_path = f"images/vehicle_reg_numbers/{image_name}.jpg"
+        vehicle_reg_number = get_vehicle_reg_number(image_path)
+        print("Vehicle number:", vehicle_reg_number)
+
+        if get_vehicle_status(vehicle_reg_number):
+            print("Valid vehicle, opening gate...")
+            open_gate()
+            sleep(5)  # wait for gate to close after 5 seconds
+
+            print("Waiting for pump interaction...")
+            GPIO.wait_for_edge(13, GPIO.RISING)  # wait again
+
+            meter_image_name = capture_image("meter")
+            meter_image_path = f"images/meter_readings/{meter_image_name}.jpg"
+            amount, litres = get_meter_reading(meter_image_path)
+            print("Amount:", amount)
+            print("Litres:", litres)
         else:
-            print("No object")
+            print("Not a registered vehicle")
+
                 
                 
 if __name__ == "__main__":
