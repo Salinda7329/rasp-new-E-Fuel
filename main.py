@@ -33,10 +33,6 @@ def capture_image(type="vehicle", camera_device="/dev/video0"):
     if type == "vehicle":
         image_path = f"images/vehicle_reg_numbers/{image_name}.jpg"
     elif type == "meter":
-<<<<<<< HEAD
-        cam = pygame.camera.Camera("/dev/video2", (640,480))
-=======
->>>>>>> efb945fcd7a890392cd6a75c30b1cd957c97b503
         image_path = f"images/meter_readings/{image_name}.jpg"
     else:
         print("Invalid capture type")
@@ -166,19 +162,19 @@ def get_meter_reading_with_retry(camera_device, max_attempts=3):
                 try:
                     rupees = float(lines[1].text.replace(' ', '')) / 10
                     litres = float(lines[3].text.replace(' ', ''))
-                    print("✅ OCR success.")
+                    print("OCR success.")
                     return rupees, litres
                 except ValueError:
-                    print("⚠️ OCR text couldn't be converted to numbers.")
+                    print("OCR text couldn't be converted to numbers.")
             else:
-                print("⚠️ Not enough lines detected in OCR.")
+                print("Not enough lines detected in OCR.")
         else:
-            print("⚠️ OCR returned no results.")
+            print("OCR returned no results.")
 
         attempt += 1
-        print("🔁 Retrying...\n")
+        print("Retrying...\n")
 
-    print("❌ All attempts failed.")
+    print("All attempts failed.")
     return None, None
 
 
