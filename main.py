@@ -22,7 +22,6 @@ GPIO.setup(13, GPIO.IN)
 GPIO.setup(16, GPIO.IN)
 
 
-
 gate_pin = GPIO.PWM(11, 50)
 
 def capture_image(type="vehicle", camera_device="/dev/video0"):
