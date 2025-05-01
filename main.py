@@ -12,6 +12,7 @@ import RPi.GPIO as GPIO
 from time import sleep
 
 GPIO.setmode(GPIO.BOARD)
+GPIO.setwarnings(False)
 
 GPIO.setup(11, GPIO.OUT)
 # GPIO.setup(13, GPIO.IN)
@@ -159,6 +160,8 @@ def main():
         print("Waiting for object...")
         GPIO.wait_for_edge(13, GPIO.RISING)
         print("Object detected")
+        print("GPIO input:", GPIO.input(13))
+
 
         image_name = capture_image("vehicle")
         if image_name is None:
@@ -226,6 +229,8 @@ def capture_image(type="vehicle"):
     cam.stop()
     return image_name
 
-    
+finally:
+    GPIO.cleanup()
+  
 
 
