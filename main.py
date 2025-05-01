@@ -36,8 +36,7 @@ def capture_image(type="vehicle"):
         cam = pygame.camera.Camera("/dev/video0", (640,480))
         image_path = f"images/vehicle_reg_numbers/{image_name}.jpg"
     elif type == "meter":
-        cam = pygame.camera.Camera("/dev/video1", (640,480))
-#        cam = pygame.camera.Camera("/dev/video2", (640,480))
+        cam = pygame.camera.Camera("/dev/video2", (640,480))
         image_path = f"images/meter_readings/{image_name}.jpg"
         
     cam.start()
