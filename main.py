@@ -14,7 +14,10 @@ from time import sleep
 GPIO.setmode(GPIO.BOARD)
 
 GPIO.setup(11, GPIO.OUT)
-GPIO.setup(13, GPIO.IN)
+# GPIO.setup(13, GPIO.IN)
+# add pull down resistor to pin 13
+GPIO.setup(13, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+
 gate_pin = GPIO.PWM(11, 50)
 #test commit
 def capture_image(type="vehicle"):
