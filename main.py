@@ -10,6 +10,7 @@ from azure.core.credentials import AzureKeyCredential
 import psycopg2
 import RPi.GPIO as GPIO
 from time import sleep
+from datetime import datetime
 
 GPIO.setmode(GPIO.BOARD)
 GPIO.setwarnings(False)
@@ -175,17 +176,39 @@ def get_meter_reading_with_retry(camera_device, max_attempts=3):
     print("All attempts failed.")
     return None, None
 
+def log_vehicle_exit(vehicle_no, gate_open_time, exit_time, amount, litres):
+    conn = get_db_connection()
+    if not conn:
+        print("Failed to log vehicle: DB connection failed.")
+        return
+
+    try:
+        curr = conn.cursor()
+        curr.execute(
+            """
+            INSERT INTO vehicle_logs (vehicle_no, gate_open_time, exit_time, amount, litres)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (vehicle_no, gate_open_time, exit_time, amount, litres)
+        )
+        conn.commit()
+        print("Vehicle exit logged successfully.")
+    except Exception as e:
+        print("Error logging vehicle data:", e)
+    finally:
+        conn.close()
+
+
+
 def main():
     try:
         while True:
             print("Waiting for object...")
             GPIO.wait_for_edge(13, GPIO.FALLING)
             print("Object detected")
-            print("GPIO input:", GPIO.input(13))
 
             image_name = capture_image("vehicle")
             if image_name is None:
-                print("No image name")
                 continue
 
             image_path = f"images/vehicle_reg_numbers/{image_name}.jpg"
@@ -193,22 +216,22 @@ def main():
             print("Vehicle number:", vehicle_reg_number)
 
             if get_vehicle_status(vehicle_reg_number):
+                gate_open_time = datetime.now()
                 print("Valid vehicle, opening gate...")
                 open_gate()
-                sleep(5)
 
                 print("Waiting for vehicle exit (IR2)...")
                 GPIO.wait_for_edge(16, GPIO.FALLING)
+                exit_time = datetime.now()
                 print("Vehicle Exit detected.")
 
                 amount, litres = get_meter_reading_with_retry("/dev/video2")
                 print("Amount:", amount)
                 print("Litres:", litres)
+
+                log_vehicle_exit(vehicle_reg_number, gate_open_time, exit_time, amount, litres)
             else:
                 print("Not a registered vehicle")
     finally:
         print("Cleaning up GPIO...")
         GPIO.cleanup()
-
-if __name__ == "__main__":
-    main()
