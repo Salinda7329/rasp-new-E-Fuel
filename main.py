@@ -13,9 +13,14 @@ from time import sleep
 
 GPIO.setmode(GPIO.BOARD)
 GPIO.setwarnings(False)
-
+# motor pin
 GPIO.setup(11, GPIO.OUT)
+# ir pins
+# ir 1 
 GPIO.setup(13, GPIO.IN)
+# ir 2 
+GPIO.setup(16, GPIO.IN)
+
 
 
 gate_pin = GPIO.PWM(11, 50)
@@ -176,8 +181,10 @@ def main():
                 open_gate()
                 sleep(5)  # wait for gate to close
 
-                print("Waiting for pump interaction...")
-                GPIO.wait_for_edge(13, GPIO.RISING, timeout=5000, bouncetime=300)
+                print("Waiting for vehicle exit (IR2)...")
+                GPIO.wait_for_edge(16, GPIO.FALLING)  # or RISING depending on sensor behavior
+                print("Vehicle Exit detected.")
+
 
                 meter_image_name = capture_image("meter")
                 meter_image_path = f"images/meter_readings/{meter_image_name}.jpg"
