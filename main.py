@@ -134,11 +134,13 @@ def get_vehicle_status(vehicle_reg_number):
     return False
 
 def get_meter_reading_with_retry(camera_device, max_attempts=3):
+    from azure.ai.vision import ImageAnalysisClient, AzureKeyCredential, VisualFeatures
+    import os
+
     attempt = 0
-    rupees, litres = None, None
 
     while attempt < max_attempts:
-        print(f"Attempt {attempt+1} to capture meter reading...")
+        print(f"Attempt {attempt + 1} to capture meter reading...")
 
         image_name = capture_image("meter", camera_device)
         image_path = f"images/meter_readings/{image_name}.jpg"
@@ -169,16 +171,28 @@ def get_meter_reading_with_retry(camera_device, max_attempts=3):
             for line in lines:
                 print(f"Line: '{line.text}'")
 
-            if len(lines) >= 4:
-                try:
-                    rupees = float(lines[1].text.replace(' ', '')) / 10
-                    litres = float(lines[3].text.replace(' ', ''))
-                    print("OCR success.")
-                    return rupees, litres
-                except ValueError:
-                    print("OCR text couldn't be converted to numbers.")
+            rupees, litres = None, None
+
+            for i, line in enumerate(lines):
+                text = line.text.lower().strip()
+                if "rupees" in text and i + 1 < len(lines):
+                    raw = lines[i + 1].text.strip()
+                    try:
+                        rupees = float("".join(c for c in raw if c.isdigit() or c == "."))
+                    except ValueError:
+                        print(f"[!] Couldn't parse Rupees from '{raw}'")
+                elif "litres" in text and i + 1 < len(lines):
+                    raw = lines[i + 1].text.strip()
+                    try:
+                        litres = float("".join(c for c in raw if c.isdigit() or c == "."))
+                    except ValueError:
+                        print(f"[!] Couldn't parse Litres from '{raw}'")
+
+            if rupees is not None and litres is not None:
+                print("OCR success.")
+                return rupees, litres
             else:
-                print("Not enough lines detected in OCR.")
+                print("Rupees or litres not detected correctly.")
         else:
             print("OCR returned no results.")
 
@@ -187,6 +201,8 @@ def get_meter_reading_with_retry(camera_device, max_attempts=3):
 
     print("All attempts failed.")
     return None, None
+
+
 
 def log_vehicle_exit(vehicle_no, gate_open_time, exit_time, amount, litres):
     conn = get_db_connection()
