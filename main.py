@@ -21,6 +21,7 @@ GPIO.setup(11, GPIO.OUT)
 # ir pins
 GPIO.setup(13, GPIO.IN)  # IR1
 GPIO.setup(16, GPIO.IN)  # IR2
+GPIO.setup(15, GPIO.IN)  # IR3 - vehicle passed gate (new)
 
 gate_pin = GPIO.PWM(11, 50)
 
@@ -98,11 +99,22 @@ def get_db_connection():
 
 def open_gate():
     gate_pin.start(0)
-    gate_pin.ChangeDutyCycle(3)
+    gate_pin.ChangeDutyCycle(3)  # Unlock or rotate to open
     sleep(1)
-    gate_pin.ChangeDutyCycle(12)
+    gate_pin.ChangeDutyCycle(12)  # Keep it open
     sleep(1)
     gate_pin.stop()
+    print("Gate opened.")
+
+def close_gate():
+    gate_pin.start(0)
+    gate_pin.ChangeDutyCycle(12)  # Adjust as per servo
+    sleep(1)
+    gate_pin.ChangeDutyCycle(3)
+    sleep(1)
+    gate_pin.stop()
+    print("Gate closed.")
+
 
 def get_vehicle_status(vehicle_reg_number):
     conn = get_db_connection()
@@ -203,9 +215,9 @@ def log_vehicle_exit(vehicle_no, gate_open_time, exit_time, amount, litres):
 def main():
     try:
         while True:
-            print("Waiting for object...")
+            print("Waiting for vehicle arrival (IR1)...")
             GPIO.wait_for_edge(13, GPIO.FALLING)
-            print("Object detected")
+            print("Vehicle arrived at gate.")
 
             image_name = capture_image("vehicle")
             if image_name is None:
@@ -217,13 +229,18 @@ def main():
 
             if get_vehicle_status(vehicle_reg_number):
                 gate_open_time = datetime.now()
-                print("Valid vehicle, opening gate...")
+                print("Valid vehicle. Opening gate...")
                 open_gate()
 
-                print("Waiting for vehicle exit (IR2)...")
+                print("Waiting for vehicle to fully enter (IR3)...")
+                GPIO.wait_for_edge(15, GPIO.FALLING)
+                print("Vehicle fully entered. Closing gate...")
+                close_gate()
+
+                print("Waiting for vehicle to exit (IR2)...")
                 GPIO.wait_for_edge(16, GPIO.FALLING)
                 exit_time = datetime.now()
-                print("Vehicle Exit detected.")
+                print("Vehicle exit detected.")
 
                 amount, litres = get_meter_reading_with_retry("/dev/video2")
                 print("Amount:", amount)
@@ -231,10 +248,7 @@ def main():
 
                 log_vehicle_exit(vehicle_reg_number, gate_open_time, exit_time, amount, litres)
             else:
-                print("Not a registered vehicle")
+                print("Vehicle not registered.")
     finally:
         print("Cleaning up GPIO...")
         GPIO.cleanup()
-        
-if __name__ == "__main__":
-    main()
