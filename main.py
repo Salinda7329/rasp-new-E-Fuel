@@ -252,3 +252,7 @@ def main():
     finally:
         print("Cleaning up GPIO...")
         GPIO.cleanup()
+
+
+if __name__ == "__main__":
+    main()
