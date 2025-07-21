@@ -23,8 +23,8 @@ GPIO.setup(11, GPIO.OUT)
 
 # IR sensor pins
 GPIO.setup(13, GPIO.IN)  # IR1
-GPIO.setup(16, GPIO.IN)  # IR2
-GPIO.setup(15, GPIO.IN)  # IR3
+GPIO.setup(15, GPIO.IN)  # IR2 16 to 15
+GPIO.setup(16, GPIO.IN)  # IR3 15 to 16
 
 gate_pin = GPIO.PWM(11, 50)
 
@@ -231,13 +231,14 @@ def main():
                 open_gate()
 
                 print("Waiting for vehicle to fully enter (IR3)...")
-                GPIO.wait_for_edge(15, GPIO.FALLING)
+                GPIO.wait_for_edge(16, GPIO.FALLING) # 15 to 16
                 sleep(0.5)
                 print("Vehicle fully entered. Closing gate...")
                 close_gate()
 
                 print("Waiting for vehicle to exit (IR2)...")
-                GPIO.wait_for_edge(16, GPIO.FALLING)
+                # 16 to 15
+                GPIO.wait_for_edge(15, GPIO.FALLING)
                 sleep(0.5)
                 exit_time = datetime.now()
                 print("Vehicle exit detected.")
