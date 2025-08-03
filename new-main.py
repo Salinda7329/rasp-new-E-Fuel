@@ -3,6 +3,7 @@ import pygame.camera
 import os
 import uuid
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from azure.ai.vision.imageanalysis import ImageAnalysisClient
@@ -28,6 +29,7 @@ GPIO.setup(15, GPIO.IN)  # IR3
 
 gate_pin = GPIO.PWM(11, 50)
 
+
 # === IMAGE CAPTURE ===
 def capture_image(type="vehicle", camera_device="/dev/video0"):
     pygame.camera.init()
@@ -48,6 +50,7 @@ def capture_image(type="vehicle", camera_device="/dev/video0"):
     cam.stop()
     return image_name
 
+
 # === VISION CLIENT ===
 def get_vision_client():
     try:
@@ -58,6 +61,7 @@ def get_vision_client():
         exit()
     return ImageAnalysisClient(endpoint=endpoint, credential=AzureKeyCredential(key))
 
+
 # === VEHICLE NUMBER OCR ===
 def get_vehicle_reg_number(image_path):
     client = get_vision_client()
@@ -65,8 +69,7 @@ def get_vehicle_reg_number(image_path):
         image_data = f.read()
 
     result = client.analyze(
-        image_data=image_data,
-        visual_features=[VisualFeatures.READ]
+        image_data=image_data, visual_features=[VisualFeatures.READ]
     )
 
     vehicle_reg_number = None
@@ -78,6 +81,7 @@ def get_vehicle_reg_number(image_path):
         print("OCR operation failed or no text detected.")
 
     return vehicle_reg_number
+
 
 # === DATABASE CONNECTION ===
 def get_db_connection():
@@ -93,6 +97,7 @@ def get_db_connection():
         print("DB connection error:", error)
         return False
 
+
 # === GATE CONTROL ===
 def open_gate():
     gate_pin.start(0)
@@ -103,6 +108,7 @@ def open_gate():
     gate_pin.stop()
     print("Gate opened.")
 
+
 def close_gate():
     gate_pin.start(0)
     gate_pin.ChangeDutyCycle(12)
@@ -112,6 +118,7 @@ def close_gate():
     gate_pin.stop()
     print("Gate closed.")
 
+
 # === VEHICLE STATUS CHECK ===
 def get_vehicle_status(vehicle_reg_number):
     conn = get_db_connection()
@@ -119,10 +126,21 @@ def get_vehicle_status(vehicle_reg_number):
         print("Unable to connect DB")
         return False
     curr = conn.cursor()
-    curr.execute("SELECT * FROM vehicles WHERE vehicle_no = %s", (vehicle_reg_number,))
-    data = curr.fetchall()
+
+    # Normalize the OCR result
+    normalized_reg = vehicle_reg_number.replace(" ", "").upper()
+
+    # Fetch all vehicle numbers from DB and compare normalized
+    curr.execute("SELECT vehicle_no FROM vehicles")
+    rows = curr.fetchall()
     conn.close()
-    return len(data) > 0
+
+    # Check if any stored vehicle number (normalized) matches
+    for (db_reg,) in rows:
+        if db_reg.replace(" ", "").upper() == normalized_reg:
+            return True
+    return False
+
 
 # === METER READING OCR ===
 def get_meter_reading_with_retry(camera_device, max_attempts=3):
@@ -138,8 +156,7 @@ def get_meter_reading_with_retry(camera_device, max_attempts=3):
             image_data = f.read()
 
         result = client.analyze(
-            image_data=image_data,
-            visual_features=[VisualFeatures.READ]
+            image_data=image_data, visual_features=[VisualFeatures.READ]
         )
 
         if result.read and result.read.blocks:
@@ -161,13 +178,17 @@ def get_meter_reading_with_retry(camera_device, max_attempts=3):
                 if "rupees" in text and i + 1 < len(lines):
                     raw = lines[i + 1].text.strip().replace(",", "")
                     try:
-                        rupees = float("".join(c for c in raw if c.isdigit() or c == "."))
+                        rupees = float(
+                            "".join(c for c in raw if c.isdigit() or c == ".")
+                        )
                     except ValueError:
                         print(f"[!] Couldn't parse Rupees from '{raw}'")
                 elif "litres" in text and i + 1 < len(lines):
                     raw = lines[i + 1].text.strip().replace(",", "")
                     try:
-                        litres = float("".join(c for c in raw if c.isdigit() or c == "."))
+                        litres = float(
+                            "".join(c for c in raw if c.isdigit() or c == ".")
+                        )
                     except ValueError:
                         print(f"[!] Couldn't parse Litres from '{raw}'")
 
@@ -185,6 +206,7 @@ def get_meter_reading_with_retry(camera_device, max_attempts=3):
     print("All attempts failed.")
     return None, None
 
+
 # === VEHICLE EXIT LOGGING ===
 def log_vehicle_exit(vehicle_no, gate_open_time, exit_time, amount, litres):
     conn = get_db_connection()
@@ -199,7 +221,7 @@ def log_vehicle_exit(vehicle_no, gate_open_time, exit_time, amount, litres):
             INSERT INTO vehicle_logs (vehicle_no, gate_open_time, exit_time, amount, litres)
             VALUES (%s, %s, %s, %s, %s)
             """,
-            (vehicle_no, gate_open_time, exit_time, amount, litres)
+            (vehicle_no, gate_open_time, exit_time, amount, litres),
         )
         conn.commit()
         print("Vehicle exit logged successfully.")
@@ -207,6 +229,7 @@ def log_vehicle_exit(vehicle_no, gate_open_time, exit_time, amount, litres):
         print("Error logging vehicle data:", e)
     finally:
         conn.close()
+
 
 # === MAIN LOGIC ===
 def main():
@@ -263,7 +286,9 @@ def main():
                 print("Amount:", amount)
                 print("Litres:", litres)
 
-                log_vehicle_exit(vehicle_reg_number, gate_open_time, exit_time, amount, litres)
+                log_vehicle_exit(
+                    vehicle_reg_number, gate_open_time, exit_time, amount, litres
+                )
             else:
                 print("Vehicle not registered.")
     finally:
