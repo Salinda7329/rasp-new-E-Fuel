@@ -352,6 +352,21 @@ def main():
                 continue
             if balance < 500:
                 print(f"Insufficient minimum balance. Current balance: Rs. {balance}")
+                customer_email = get_customer_email(user_id)
+                if customer_email:
+                    subject = "Fuel Station: Insufficient Balance"
+                    content = (
+                        f"Dear customer,\n\n"
+                        f"Your vehicle ({vehicle_reg_number}) was denied entry at the fuel station "
+                        f"on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} due to insufficient minimum balance.\n"
+                        f"Current balance: Rs. {balance}\n"
+                        f"Minimum required balance: Rs. 500\n\n"
+                        f"Please top-up your account to access fuel services.\n"
+                        f"Thank you."
+                    )
+                    send_email(customer_email, subject, content)
+                else:
+                    print("Customer email not found or MongoDB error.")
                 continue
 
             gate_open_time = datetime.now()
