@@ -15,6 +15,9 @@ import RPi.GPIO as GPIO
 from time import sleep
 from datetime import datetime
 
+import smtplib
+from email.message import EmailMessage
+
 # === GPIO SETUP ===
 GPIO.setmode(GPIO.BOARD)
 GPIO.setwarnings(False)
@@ -231,6 +234,54 @@ def log_vehicle_exit(vehicle_no, gate_open_time, exit_time, amount, litres):
         conn.close()
 
 
+# === GET OWNER EMAIL ===
+def get_owner_email_postgres(vehicle_reg_number):
+    try:
+        conn = psycopg2.connect(
+            database=os.environ["DB_NAME"],
+            user=os.environ["DB_USER"],
+            password=os.environ["DB_PASSWORD"],
+            host=os.environ["DB_HOST"],
+            port=os.environ["DB_PORT"],
+        )
+        curr = conn.cursor()
+        curr.execute(
+            """
+            SELECT owner_email FROM public.vehicles 
+            WHERE REPLACE(UPPER(vehicle_no), ' ', '') = REPLACE(UPPER(%s), ' ', '') 
+            LIMIT 1
+            """,
+            (vehicle_reg_number,),
+        )
+        row = curr.fetchone()
+        conn.close()
+        if row:
+            return row[0]
+    except Exception as error:
+        print("DB connection error (Postgres owner_email):", error)
+    return None
+
+
+# === SEND EMAIL NOTIFICATION ===
+def send_email(to_email, subject, content):
+    GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS")
+    GMAIL_PASSWORD = os.environ.get("GMAIL_PASSWORD")
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = GMAIL_ADDRESS
+    msg["To"] = to_email
+    msg.set_content(content)
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+            smtp.login(GMAIL_ADDRESS, GMAIL_PASSWORD)
+            smtp.send_message(msg)
+        print(f"Email sent to {to_email}")
+    except Exception as e:
+        print("Email failed:", e)
+
+
 # === MAIN LOGIC ===
 def main():
     try:
@@ -240,7 +291,7 @@ def main():
             sleep(0.5)  # Debounce
             print("Vehicle arrived at gate.")
 
-            # Add 3 second delay before capturing image
+            # Add 5 second delay before capturing image
             print("Waiting 5 seconds before capturing vehicle image...")
             sleep(5)
 
@@ -289,6 +340,22 @@ def main():
                 log_vehicle_exit(
                     vehicle_reg_number, gate_open_time, exit_time, amount, litres
                 )
+
+                # === Send owner email notification ===
+                owner_email = get_owner_email_postgres(vehicle_reg_number)
+                if owner_email:
+                    subject = "Fuel Station: Vehicle Exit Notification"
+                    content = (
+                        f"Dear customer,\n\n"
+                        f"Your vehicle ({vehicle_reg_number}) exited the fuel station at {exit_time.strftime('%Y-%m-%d %H:%M:%S')}.\n"
+                        f"Amount: Rs. {amount}\n"
+                        f"Litres: {litres}\n\n"
+                        f"Thank you for using our service."
+                    )
+                    send_email(owner_email, subject, content)
+                else:
+                    print("Owner email not found for this vehicle.")
+
             else:
                 print("Vehicle not registered.")
     finally:
