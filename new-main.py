@@ -217,13 +217,30 @@ def main():
             sleep(0.5)  # Debounce
             print("Vehicle arrived at gate.")
 
-            image_name = capture_image("vehicle")
-            if image_name is None:
-                continue
+            # Add 3 second delay before capturing image
+            print("Waiting 3 seconds before capturing vehicle image...")
+            sleep(3)
 
-            image_path = f"images/vehicle_reg_numbers/{image_name}.jpg"
-            vehicle_reg_number = get_vehicle_reg_number(image_path)
-            print("Vehicle number:", vehicle_reg_number)
+            # Try to capture vehicle number up to 3 times
+            vehicle_reg_number = None
+            for attempt in range(3):
+                print(f"Vehicle number plate capture attempt {attempt + 1}...")
+                image_name = capture_image("vehicle")
+                if image_name is None:
+                    print("Image capture failed, retrying...")
+                    continue
+
+                image_path = f"images/vehicle_reg_numbers/{image_name}.jpg"
+                vehicle_reg_number = get_vehicle_reg_number(image_path)
+                if vehicle_reg_number:
+                    print(f"Vehicle number detected: {vehicle_reg_number}")
+                    break
+                else:
+                    print("Failed to detect vehicle number, retrying...")
+
+            if not vehicle_reg_number:
+                print("Failed to capture vehicle number after 3 attempts. Skipping...")
+                continue
 
             if get_vehicle_status(vehicle_reg_number):
                 gate_open_time = datetime.now()
@@ -231,14 +248,13 @@ def main():
                 open_gate()
 
                 print("Waiting for vehicle to fully enter (IR2)...")
-                GPIO.wait_for_edge(16, GPIO.FALLING) # 15 to 16
+                GPIO.wait_for_edge(16, GPIO.FALLING)  # 15 to 16
                 sleep(0.5)
                 print("Vehicle fully entered. Closing gate...")
                 close_gate()
 
                 print("Waiting for vehicle to exit (IR3)...")
-                # 16 to 15
-                GPIO.wait_for_edge(15, GPIO.FALLING)
+                GPIO.wait_for_edge(15, GPIO.FALLING)  # 16 to 15
                 sleep(0.5)
                 exit_time = datetime.now()
                 print("Vehicle exit detected.")
@@ -253,6 +269,7 @@ def main():
     finally:
         print("Cleaning up GPIO...")
         GPIO.cleanup()
+
 
 if __name__ == "__main__":
     main()
