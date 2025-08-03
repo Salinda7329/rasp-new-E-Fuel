@@ -241,8 +241,8 @@ def main():
             print("Vehicle arrived at gate.")
 
             # Add 3 second delay before capturing image
-            print("Waiting 3 seconds before capturing vehicle image...")
-            sleep(3)
+            print("Waiting 5 seconds before capturing vehicle image...")
+            sleep(5)
 
             # Try to capture vehicle number up to 3 times
             vehicle_reg_number = None
